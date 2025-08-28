@@ -3,65 +3,296 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minesweeper - Classic Game</title>
+    <title>Minesweeper 3D - The Ultimate Experience</title>
     <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     <div class="container">
+        <!-- Background Effects -->
+        <div class="bg-effects">
+            <div class="floating-particles"></div>
+            <div class="grid-overlay"></div>
+            <div class="ambient-glow"></div>
+        </div>
+
         <header class="header">
-            <h1 class="title">Minesweeper</h1>
-            <p class="subtitle">The classic puzzle game, reimagined</p>
+            <div class="logo-container">
+                <div class="logo-3d">
+                    <span class="logo-face front">💣</span>
+                    <span class="logo-face back">⚡</span>
+                </div>
+                <div class="title-group">
+                    <h1 class="title">
+                        <span class="title-3d">MINESWEEPER</span>
+                        <span class="title-shadow">MINESWEEPER</span>
+                        <span class="title-glow">MINESWEEPER</span>
+                    </h1>
+                    <p class="subtitle">
+                        <span class="typewriter">The Ultimate 3D Experience</span>
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Achievement Notifications -->
+            <div class="achievement-popup" id="achievement-popup">
+                <div class="achievement-icon">🏆</div>
+                <div class="achievement-text">
+                    <div class="achievement-title">Achievement Unlocked!</div>
+                    <div class="achievement-desc"></div>
+                </div>
+            </div>
         </header>
 
         <main class="game-container">
             <div class="game-controls">
-                <div class="stats">
-                    <div class="stat-item">
-                        <span class="stat-label">Mines</span>
-                        <span class="stat-value" id="mines-count">10</span>
+                <div class="control-panel">
+                    <div class="stats-3d">
+                        <div class="stat-cube">
+                            <div class="cube-face front">
+                                <i class="fas fa-bomb stat-icon"></i>
+                                <div class="stat-content">
+                                    <span class="stat-label">Mines</span>
+                                    <span class="stat-value glitch-text" id="mines-count">10</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-cube">
+                            <div class="cube-face front">
+                                <i class="fas fa-clock stat-icon"></i>
+                                <div class="stat-content">
+                                    <span class="stat-label">Time</span>
+                                    <span class="stat-value digital-clock" id="timer">000</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-cube">
+                            <div class="cube-face front">
+                                <i class="fas fa-flag stat-icon"></i>
+                                <div class="stat-content">
+                                    <span class="stat-label">Flags</span>
+                                    <span class="stat-value neon-glow" id="flags-count">0</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-cube">
+                            <div class="cube-face front">
+                                <i class="fas fa-zap stat-icon"></i>
+                                <div class="stat-content">
+                                    <span class="stat-label">Score</span>
+                                    <span class="stat-value rainbow-text" id="score">0</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Time</span>
-                        <span class="stat-value" id="timer">000</span>
+                
+                    <div class="game-modes">
+                        <div class="mode-selector">
+                            <div class="mode-tab active" data-mode="classic">
+                                <i class="fas fa-gamepad"></i>
+                                <span>Classic</span>
+                            </div>
+                            <div class="mode-tab" data-mode="speed">
+                                <i class="fas fa-bolt"></i>
+                                <span>Speed</span>
+                            </div>
+                            <div class="mode-tab" data-mode="nightmare">
+                                <i class="fas fa-skull"></i>
+                                <span>Nightmare</span>
+                            </div>
+                        </div>
+                        
+                        <div class="difficulty-hologram">
+                            <div class="hologram-btn active" data-difficulty="easy">
+                                <div class="hologram-face">
+                                    <i class="fas fa-seedling"></i>
+                                    <span>Novice</span>
+                                    <small>9×9 • 10 mines</small>
+                                </div>
+                            </div>
+                            <div class="hologram-btn" data-difficulty="medium">
+                                <div class="hologram-face">
+                                    <i class="fas fa-fire"></i>
+                                    <span>Expert</span>
+                                    <small>16×16 • 40 mines</small>
+                                </div>
+                            </div>
+                            <div class="hologram-btn" data-difficulty="hard">
+                                <div class="hologram-face">
+                                    <i class="fas fa-skull-crossbones"></i>
+                                    <span>Master</span>
+                                    <small>16×30 • 99 mines</small>
+                                </div>
+                            </div>
+                            <div class="hologram-btn" data-difficulty="extreme">
+                                <div class="hologram-face">
+                                    <i class="fas fa-dragon"></i>
+                                    <span>Extreme</span>
+                                    <small>24×32 • 200 mines</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="power-ups">
+                            <button class="power-btn" id="hint-btn" title="Get a hint">
+                                <i class="fas fa-lightbulb"></i>
+                                <span class="power-cooldown"></span>
+                            </button>
+                            <button class="power-btn" id="scanner-btn" title="Scan area">
+                                <i class="fas fa-radar"></i>
+                                <span class="power-cooldown"></span>
+                            </button>
+                            <button class="power-btn" id="shield-btn" title="One-time protection">
+                                <i class="fas fa-shield-alt"></i>
+                                <span class="power-cooldown"></span>
+                            </button>
+                        </div>
                     </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Flags</span>
-                        <span class="stat-value" id="flags-count">0</span>
+                    
+                    <div class="control-buttons">
+                        <button class="cyber-btn primary" id="new-game">
+                            <div class="btn-bg"></div>
+                            <div class="btn-content">
+                                <i class="fas fa-rocket"></i>
+                                <span>LAUNCH GAME</span>
+                            </div>
+                            <div class="btn-particles"></div>
+                        </button>
+                        
+                        <button class="cyber-btn secondary" id="auto-solve">
+                            <div class="btn-bg"></div>
+                            <div class="btn-content">
+                                <i class="fas fa-brain"></i>
+                                <span>AI SOLVE</span>
+                            </div>
+                        </button>
+                        
+                        <button class="cyber-btn tertiary" id="settings-btn">
+                            <div class="btn-bg"></div>
+                            <div class="btn-content">
+                                <i class="fas fa-cog"></i>
+                            </div>
+                        </button>
                     </div>
                 </div>
-                
-                <div class="difficulty-selector">
-                    <button class="difficulty-btn active" data-difficulty="easy">Easy</button>
-                    <button class="difficulty-btn" data-difficulty="medium">Medium</button>
-                    <button class="difficulty-btn" data-difficulty="hard">Hard</button>
-                </div>
-                
-                <button class="new-game-btn" id="new-game">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
-                        <path d="M21 3v5h-5"/>
-                        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
-                        <path d="M3 21v-5h5"/>
-                    </svg>
-                    New Game
-                </button>
             </div>
 
-            <div class="game-board-container">
-                <div class="game-status" id="game-status">
-                    <div class="status-icon" id="status-icon">🙂</div>
-                    <div class="status-text" id="status-text">Click to start!</div>
+            <div class="game-arena">
+                <div class="arena-hud">
+                    <div class="status-display">
+                        <div class="holographic-status">
+                            <div class="status-avatar" id="status-avatar">
+                                <div class="avatar-ring"></div>
+                                <div class="avatar-face" id="avatar-face">🎯</div>
+                                <div class="avatar-particles"></div>
+                            </div>
+                            <div class="status-info">
+                                <div class="status-title" id="status-title">SYSTEM READY</div>
+                                <div class="status-message" id="status-message">Initialize mining protocol</div>
+                                <div class="status-bar">
+                                    <div class="progress-fill" id="progress-fill"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="combo-display">
+                            <div class="combo-text">COMBO</div>
+                            <div class="combo-value" id="combo-value">×1</div>
+                            <div class="combo-bar">
+                                <div class="combo-fill" id="combo-fill"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="game-board" id="game-board"></div>
+                
+                <div class="board-3d-container">
+                    <div class="board-stage" id="board-stage">
+                        <div class="game-board-3d" id="game-board"></div>
+                        <div class="explosion-layer" id="explosion-layer"></div>
+                        <div class="particle-system" id="particle-system"></div>
+                    </div>
+                    
+                    <div class="board-controls">
+                        <div class="view-controls">
+                            <button class="view-btn" id="rotate-left"><i class="fas fa-undo"></i></button>
+                            <button class="view-btn" id="zoom-in"><i class="fas fa-search-plus"></i></button>
+                            <button class="view-btn" id="zoom-out"><i class="fas fa-search-minus"></i></button>
+                            <button class="view-btn" id="rotate-right"><i class="fas fa-redo"></i></button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
 
+        <!-- Settings Panel -->
+        <div class="settings-panel" id="settings-panel">
+            <div class="panel-header">
+                <h3>⚙️ SYSTEM CONFIG</h3>
+                <button class="close-btn" id="close-settings">×</button>
+            </div>
+            <div class="panel-content">
+                <div class="setting-group">
+                    <label>Graphics Quality</label>
+                    <select id="graphics-quality">
+                        <option value="ultra">Ultra</option>
+                        <option value="high" selected>High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label>Particle Effects</label>
+                    <input type="checkbox" id="particles-enabled" checked>
+                </div>
+                <div class="setting-group">
+                    <label>Sound Effects</label>
+                    <input type="checkbox" id="sound-enabled" checked>
+                </div>
+                <div class="setting-group">
+                    <label>Background Music</label>
+                    <input type="checkbox" id="music-enabled">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Leaderboard -->
+        <div class="leaderboard-panel" id="leaderboard">
+            <div class="panel-header">
+                <h3>🏆 HALL OF FAME</h3>
+                <button class="close-btn" id="close-leaderboard">×</button>
+            </div>
+            <div class="leaderboard-content">
+                <div class="leaderboard-tabs">
+                    <button class="tab-btn active" data-tab="today">Today</button>
+                    <button class="tab-btn" data-tab="week">This Week</button>
+                    <button class="tab-btn" data-tab="all">All Time</button>
+                </div>
+                <div class="scores-list" id="scores-list">
+                    <!-- Scores will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
         <footer class="footer">
-            <p>Built with ❤️ for puzzle enthusiasts</p>
+            <div class="footer-content">
+                <div class="footer-stats">
+                    <span>Games Played: <strong id="games-played">0</strong></span>
+                    <span>Best Time: <strong id="best-time">--:--</strong></span>
+                    <span>Win Rate: <strong id="win-rate">0%</strong></span>
+                </div>
+                <p class="footer-text">
+                    <span class="cyber-text">Built with 🔥 for the ultimate puzzle experience</span>
+                </p>
+            </div>
         </footer>
     </div>
 
     <script src="script.js"></script>
+    <script src="particles.js"></script>
+    <script src="achievements.js"></script>
 </body>
 </html>

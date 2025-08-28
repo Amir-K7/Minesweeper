@@ -1,11 +1,17 @@
-class Minesweeper {
+// ============================================
+//   3D MINESWEEPER - THE ULTIMATE EXPERIENCE
+// ============================================
+
+class UltimateMinesweeper {
     constructor() {
         this.difficulties = {
-            easy: { rows: 9, cols: 9, mines: 10 },
-            medium: { rows: 16, cols: 16, mines: 40 },
-            hard: { rows: 16, cols: 30, mines: 99 }
+            easy: { rows: 9, cols: 9, mines: 10, name: 'Novice' },
+            medium: { rows: 16, cols: 16, mines: 40, name: 'Expert' },
+            hard: { rows: 16, cols: 30, mines: 99, name: 'Master' },
+            extreme: { rows: 24, cols: 32, mines: 200, name: 'Extreme' }
         };
         
+        this.gameMode = 'classic'; // classic, speed, nightmare
         this.currentDifficulty = 'easy';
         this.board = [];
         this.gameState = 'ready'; // ready, playing, won, lost
@@ -13,309 +19,77 @@ class Minesweeper {
         this.timerInterval = null;
         this.firstClick = true;
         this.flagsPlaced = 0;
+        this.score = 0;
+        this.combo = 1;
+        this.maxCombo = 1;
+        
+        // Power-ups
+        this.powerUps = {
+            hint: { available: 3, cooldown: 0 },
+            scanner: { available: 2, cooldown: 0 },
+            shield: { available: 1, cooldown: 0 }
+        };
+        
+        // 3D Board rotation
+        this.boardRotation = { x: -15, y: 5 };
+        this.boardZoom = 1;
+        
+        // Achievement tracking
+        this.achievements = new Map();
+        this.stats = {
+            gamesPlayed: parseInt(localStorage.getItem('gamesPlayed') || '0'),
+            gamesWon: parseInt(localStorage.getItem('gamesWon') || '0'),
+            bestTime: localStorage.getItem('bestTime') || null,
+            totalTime: parseInt(localStorage.getItem('totalTime') || '0')
+        };
         
         this.initializeElements();
         this.initializeEventListeners();
+        this.initializeAchievements();
+        this.updateStats();
         this.initializeGame();
+        this.setupParticleSystem();
     }
     
     initializeElements() {
+        // Game board and main elements
         this.gameBoard = document.getElementById('game-board');
+        this.boardStage = document.getElementById('board-stage');
+        this.explosionLayer = document.getElementById('explosion-layer');
+        this.particleSystem = document.getElementById('particle-system');
+        
+        // Stats
         this.minesCount = document.getElementById('mines-count');
         this.timerElement = document.getElementById('timer');
         this.flagsCount = document.getElementById('flags-count');
-        this.statusIcon = document.getElementById('status-icon');
-        this.statusText = document.getElementById('status-text');
+        this.scoreElement = document.getElementById('score');
+        
+        // Status display
+        this.avatarFace = document.getElementById('avatar-face');
+        this.statusTitle = document.getElementById('status-title');
+        this.statusMessage = document.getElementById('status-message');
+        this.progressFill = document.getElementById('progress-fill');
+        
+        // Combo display
+        this.comboValue = document.getElementById('combo-value');
+        this.comboFill = document.getElementById('combo-fill');
+        
+        // Controls
         this.newGameBtn = document.getElementById('new-game');
-        this.difficultyBtns = document.querySelectorAll('.difficulty-btn');
-    }
-    
-    initializeEventListeners() {
-        this.newGameBtn.addEventListener('click', () => this.initializeGame());
+        this.autoSolveBtn = document.getElementById('auto-solve');
+        this.settingsBtn = document.getElementById('settings-btn');
         
-        this.difficultyBtns.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                this.difficultyBtns.forEach(b => b.classList.remove('active'));
-                e.target.classList.add('active');
-                this.currentDifficulty = e.target.dataset.difficulty;
-                this.initializeGame();
-            });
-        });
-    }
-    
-    initializeGame() {
-        this.gameState = 'ready';
-        this.timer = 0;
-        this.firstClick = true;
-        this.flagsPlaced = 0;
+        // Mode and difficulty selectors
+        this.modeTabs = document.querySelectorAll('.mode-tab');
+        this.difficultyBtns = document.querySelectorAll('.hologram-btn');
         
-        if (this.timerInterval) {
-            clearInterval(this.timerInterval);
-            this.timerInterval = null;
-        }
+        // Power-ups
+        this.hintBtn = document.getElementById('hint-btn');
+        this.scannerBtn = document.getElementById('scanner-btn');
+        this.shieldBtn = document.getElementById('shield-btn');
         
-        this.updateDisplay();
-        this.createBoard();
-        this.renderBoard();
-        
-        this.statusIcon.textContent = '🙂';
-        this.statusText.textContent = 'Click to start!';
-        document.body.className = '';
-    }
-    
-    createBoard() {
-        const { rows, cols } = this.difficulties[this.currentDifficulty];
-        this.board = [];
-        
-        for (let row = 0; row < rows; row++) {
-            this.board[row] = [];
-            for (let col = 0; col < cols; col++) {
-                this.board[row][col] = {
-                    isMine: false,
-                    isRevealed: false,
-                    isFlagged: false,
-                    neighborCount: 0
-                };
-            }
-        }
-    }
-    
-    placeMines(firstClickRow, firstClickCol) {
-        const { rows, cols, mines } = this.difficulties[this.currentDifficulty];
-        let minesPlaced = 0;
-        
-        while (minesPlaced < mines) {
-            const row = Math.floor(Math.random() * rows);
-            const col = Math.floor(Math.random() * cols);
-            
-            // Don't place mine on first click or if already has mine
-            if ((row === firstClickRow && col === firstClickCol) || 
-                this.board[row][col].isMine) {
-                continue;
-            }
-            
-            this.board[row][col].isMine = true;
-            minesPlaced++;
-        }
-        
-        this.calculateNeighborCounts();
-    }
-    
-    calculateNeighborCounts() {
-        const { rows, cols } = this.difficulties[this.currentDifficulty];
-        
-        for (let row = 0; row < rows; row++) {
-            for (let col = 0; col < cols; col++) {
-                if (!this.board[row][col].isMine) {
-                    let count = 0;
-                    
-                    for (let dr = -1; dr <= 1; dr++) {
-                        for (let dc = -1; dc <= 1; dc++) {
-                            const newRow = row + dr;
-                            const newCol = col + dc;
-                            
-                            if (newRow >= 0 && newRow < rows && 
-                                newCol >= 0 && newCol < cols &&
-                                this.board[newRow][newCol].isMine) {
-                                count++;
-                            }
-                        }
-                    }
-                    
-                    this.board[row][col].neighborCount = count;
-                }
-            }
-        }
-    }
-    
-    renderBoard() {
-        const { rows, cols } = this.difficulties[this.currentDifficulty];
-        
-        this.gameBoard.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-        this.gameBoard.innerHTML = '';
-        
-        for (let row = 0; row < rows; row++) {
-            for (let col = 0; col < cols; col++) {
-                const cell = document.createElement('div');
-                cell.className = 'cell';
-                cell.dataset.row = row;
-                cell.dataset.col = col;
-                
-                cell.addEventListener('click', (e) => this.handleCellClick(e, row, col));
-                cell.addEventListener('contextmenu', (e) => this.handleRightClick(e, row, col));
-                
-                this.gameBoard.appendChild(cell);
-            }
-        }
-    }
-    
-    handleCellClick(event, row, col) {
-        event.preventDefault();
-        
-        if (this.gameState === 'won' || this.gameState === 'lost') return;
-        if (this.board[row][col].isRevealed || this.board[row][col].isFlagged) return;
-        
-        if (this.firstClick) {
-            this.placeMines(row, col);
-            this.firstClick = false;
-            this.gameState = 'playing';
-            this.startTimer();
-            this.statusText.textContent = 'Good luck!';
-        }
-        
-        this.revealCell(row, col);
-        this.updateDisplay();
-        this.checkWinCondition();
-    }
-    
-    handleRightClick(event, row, col) {
-        event.preventDefault();
-        
-        if (this.gameState === 'won' || this.gameState === 'lost') return;
-        if (this.board[row][col].isRevealed) return;
-        
-        const cell = this.board[row][col];
-        const cellElement = event.target;
-        
-        if (cell.isFlagged) {
-            cell.isFlagged = false;
-            cellElement.classList.remove('flagged');
-            this.flagsPlaced--;
-        } else {
-            cell.isFlagged = true;
-            cellElement.classList.add('flagged');
-            this.flagsPlaced++;
-        }
-        
-        this.updateDisplay();
-    }
-    
-    revealCell(row, col) {
-        const { rows, cols } = this.difficulties[this.currentDifficulty];
-        const cell = this.board[row][col];
-        
-        if (cell.isRevealed || cell.isFlagged) return;
-        
-        cell.isRevealed = true;
-        const cellElement = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
-        cellElement.classList.add('revealed');
-        
-        if (cell.isMine) {
-            this.gameOver();
-            return;
-        }
-        
-        if (cell.neighborCount > 0) {
-            cellElement.textContent = cell.neighborCount;
-            cellElement.dataset.number = cell.neighborCount;
-        } else {
-            // Auto-reveal adjacent cells for empty cells
-            for (let dr = -1; dr <= 1; dr++) {
-                for (let dc = -1; dc <= 1; dc++) {
-                    const newRow = row + dr;
-                    const newCol = col + dc;
-                    
-                    if (newRow >= 0 && newRow < rows && 
-                        newCol >= 0 && newCol < cols) {
-                        this.revealCell(newRow, newCol);
-                    }
-                }
-            }
-        }
-    }
-    
-    gameOver() {
-        this.gameState = 'lost';
-        clearInterval(this.timerInterval);
-        
-        // Reveal all mines
-        const { rows, cols } = this.difficulties[this.currentDifficulty];
-        for (let row = 0; row < rows; row++) {
-            for (let col = 0; col < cols; col++) {
-                if (this.board[row][col].isMine) {
-                    const cellElement = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
-                    cellElement.classList.add('mine');
-                }
-            }
-        }
-        
-        this.statusIcon.textContent = '😵';
-        this.statusText.textContent = 'Game Over! Try again?';
-        document.body.classList.add('game-lost');
-    }
-    
-    checkWinCondition() {
-        const { rows, cols, mines } = this.difficulties[this.currentDifficulty];
-        let revealedCount = 0;
-        
-        for (let row = 0; row < rows; row++) {
-            for (let col = 0; col < cols; col++) {
-                if (this.board[row][col].isRevealed && !this.board[row][col].isMine) {
-                    revealedCount++;
-                }
-            }
-        }
-        
-        const totalCells = rows * cols;
-        if (revealedCount === totalCells - mines) {
-            this.gameWon();
-        }
-    }
-    
-    gameWon() {
-        this.gameState = 'won';
-        clearInterval(this.timerInterval);
-        
-        // Auto-flag remaining mines
-        const { rows, cols } = this.difficulties[this.currentDifficulty];
-        for (let row = 0; row < rows; row++) {
-            for (let col = 0; col < cols; col++) {
-                if (this.board[row][col].isMine && !this.board[row][col].isFlagged) {
-                    this.board[row][col].isFlagged = true;
-                    const cellElement = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
-                    cellElement.classList.add('flagged');
-                    this.flagsPlaced++;
-                }
-            }
-        }
-        
-        this.statusIcon.textContent = '🎉';
-        this.statusText.textContent = 'Congratulations! You won!';
-        document.body.classList.add('game-won');
-        this.updateDisplay();
-    }
-    
-    startTimer() {
-        this.timerInterval = setInterval(() => {
-            this.timer++;
-            this.updateDisplay();
-        }, 1000);
-    }
-    
-    updateDisplay() {
-        const { mines } = this.difficulties[this.currentDifficulty];
-        
-        this.minesCount.textContent = mines;
-        this.timerElement.textContent = this.timer.toString().padStart(3, '0');
-        this.flagsCount.textContent = this.flagsPlaced;
-    }
-}
-
-// Initialize the game when the page loads
-document.addEventListener('DOMContentLoaded', () => {
-    new Minesweeper();
-});
-
-// Add some additional polish
-document.addEventListener('contextmenu', (e) => {
-    if (e.target.classList.contains('cell')) {
-        e.preventDefault();
-    }
-});
-
-// Add keyboard shortcuts
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'r' || e.key === 'R') {
-        document.getElementById('new-game').click();
-    }
-});
+        // View controls
+        this.rotateLeftBtn = document.getElementById('rotate-left');
+        this.rotateRightBtn = document.getElementById('rotate-right');
+        this.zoomInBtn = document.getElementById('zoom-in');
+        this.zoomOutBtn = document.getElementById('zoom-out');\n        \n        // Panels\n        this.settingsPanel = document.getElementById('settings-panel');\n        this.leaderboardPanel = document.getElementById('leaderboard');\n        this.achievementPopup = document.getElementById('achievement-popup');\n        \n        // Footer stats\n        this.gamesPlayedElement = document.getElementById('games-played');\n        this.bestTimeElement = document.getElementById('best-time');\n        this.winRateElement = document.getElementById('win-rate');\n    }\n    \n    initializeEventListeners() {\n        // Main game controls\n        this.newGameBtn.addEventListener('click', () => this.initializeGame());\n        this.autoSolveBtn.addEventListener('click', () => this.autoSolve());\n        this.settingsBtn.addEventListener('click', () => this.toggleSettings());\n        \n        // Mode selection\n        this.modeTabs.forEach(tab => {\n            tab.addEventListener('click', (e) => {\n                this.modeTabs.forEach(t => t.classList.remove('active'));\n                e.target.closest('.mode-tab').classList.add('active');\n                this.gameMode = e.target.closest('.mode-tab').dataset.mode;\n                this.initializeGame();\n            });\n        });\n        \n        // Difficulty selection\n        this.difficultyBtns.forEach(btn => {\n            btn.addEventListener('click', (e) => {\n                this.difficultyBtns.forEach(b => b.classList.remove('active'));\n                e.target.closest('.hologram-btn').classList.add('active');\n                this.currentDifficulty = e.target.closest('.hologram-btn').dataset.difficulty;\n                this.initializeGame();\n            });\n        });\n        \n        // Power-ups\n        this.hintBtn.addEventListener('click', () => this.useHint());\n        this.scannerBtn.addEventListener('click', () => this.useScanner());\n        this.shieldBtn.addEventListener('click', () => this.useShield());\n        \n        // 3D View controls\n        this.rotateLeftBtn.addEventListener('click', () => this.rotateBoard(-15, 0));\n        this.rotateRightBtn.addEventListener('click', () => this.rotateBoard(15, 0));\n        this.zoomInBtn.addEventListener('click', () => this.zoomBoard(0.1));\n        this.zoomOutBtn.addEventListener('click', () => this.zoomBoard(-0.1));\n        \n        // Settings panel\n        document.getElementById('close-settings').addEventListener('click', () => this.toggleSettings());\n        \n        // Keyboard shortcuts\n        document.addEventListener('keydown', (e) => this.handleKeyboard(e));\n        \n        // Mouse tracking for 3D effects\n        document.addEventListener('mousemove', (e) => this.handleMouseMove(e));\n        \n        // Touch events for mobile\n        this.gameBoard.addEventListener('touchstart', (e) => this.handleTouch(e));\n    }\n    \n    initializeAchievements() {\n        this.achievementDefinitions = {\n            firstWin: { name: 'First Victory', desc: 'Win your first game', icon: '🏆' },\n            speedDemon: { name: 'Speed Demon', desc: 'Complete easy in under 30 seconds', icon: '⚡' },\n            perfectionist: { name: 'Perfectionist', desc: 'Win without using any hints', icon: '💎' },\n            comboKing: { name: 'Combo King', desc: 'Achieve a 10x combo', icon: '🔥' },\n            mineClearer: { name: 'Mine Clearer', desc: 'Clear 1000 mines total', icon: '💣' },\n            streakMaster: { name: 'Streak Master', desc: 'Win 5 games in a row', icon: '🌟' },\n            explorer: { name: 'Explorer', desc: 'Try all difficulty levels', icon: '🗺️' },\n            dedication: { name: 'Dedication', desc: 'Play 100 games', icon: '⏰' }\n        };\n        \n        // Load achievements from localStorage\n        const saved = localStorage.getItem('achievements');\n        if (saved) {\n            this.achievements = new Map(JSON.parse(saved));\n        }\n    }\n    \n    setupParticleSystem() {\n        // Create particle canvas if needed\n        this.particles = [];\n        this.maxParticles = 50;\n        \n        // Start particle animation loop\n        this.animateParticles();\n    }\n    \n    initializeGame() {\n        this.gameState = 'ready';\n        this.timer = 0;\n        this.firstClick = true;\n        this.flagsPlaced = 0;\n        this.score = 0;\n        this.combo = 1;\n        this.maxCombo = 1;\n        \n        if (this.timerInterval) {\n            clearInterval(this.timerInterval);\n            this.timerInterval = null;\n        }\n        \n        // Reset power-ups based on game mode\n        this.resetPowerUps();\n        \n        this.updateDisplay();\n        this.createBoard();\n        this.renderBoard();\n        \n        this.avatarFace.textContent = '🎯';\n        this.statusTitle.textContent = 'SYSTEM READY';\n        this.statusMessage.textContent = 'Initialize mining protocol';\n        this.progressFill.style.width = '0%';\n        \n        document.body.className = '';\n        this.clearParticles();\n    }\n    \n    resetPowerUps() {\n        const powerLevels = {\n            classic: { hint: 3, scanner: 2, shield: 1 },\n            speed: { hint: 1, scanner: 1, shield: 0 },\n            nightmare: { hint: 0, scanner: 1, shield: 0 }\n        };\n        \n        const levels = powerLevels[this.gameMode] || powerLevels.classic;\n        this.powerUps.hint.available = levels.hint;\n        this.powerUps.scanner.available = levels.scanner;\n        this.powerUps.shield.available = levels.shield;\n        \n        this.updatePowerUpDisplay();\n    }\n    \n    createBoard() {\n        const { rows, cols } = this.difficulties[this.currentDifficulty];\n        this.board = [];\n        \n        for (let row = 0; row < rows; row++) {\n            this.board[row] = [];\n            for (let col = 0; col < cols; col++) {\n                this.board[row][col] = {\n                    isMine: false,\n                    isRevealed: false,\n                    isFlagged: false,\n                    isShielded: false,\n                    neighborCount: 0,\n                    row: row,\n                    col: col\n                };\n            }\n        }\n    }\n    \n    placeMines(firstClickRow, firstClickCol) {\n        const { rows, cols, mines } = this.difficulties[this.currentDifficulty];\n        let minesPlaced = 0;\n        \n        // For nightmare mode, add dynamic mine placement\n        const totalMines = this.gameMode === 'nightmare' ? Math.floor(mines * 1.2) : mines;\n        \n        while (minesPlaced < totalMines) {\n            const row = Math.floor(Math.random() * rows);\n            const col = Math.floor(Math.random() * cols);\n            \n            // Don't place mine on first click area or if already has mine\n            if (this.isFirstClickArea(row, col, firstClickRow, firstClickCol) || \n                this.board[row][col].isMine) {\n                continue;\n            }\n            \n            this.board[row][col].isMine = true;\n            minesPlaced++;\n        }\n        \n        this.calculateNeighborCounts();\n    }\n    \n    isFirstClickArea(row, col, firstRow, firstCol) {\n        // Protect 3x3 area around first click\n        return Math.abs(row - firstRow) <= 1 && Math.abs(col - firstCol) <= 1;\n    }\n    \n    calculateNeighborCounts() {\n        const { rows, cols } = this.difficulties[this.currentDifficulty];\n        \n        for (let row = 0; row < rows; row++) {\n            for (let col = 0; col < cols; col++) {\n                if (!this.board[row][col].isMine) {\n                    let count = 0;\n                    \n                    for (let dr = -1; dr <= 1; dr++) {\n                        for (let dc = -1; dc <= 1; dc++) {\n                            const newRow = row + dr;\n                            const newCol = col + dc;\n                            \n                            if (newRow >= 0 && newRow < rows && \n                                newCol >= 0 && newCol < cols &&\n                                this.board[newRow][newCol].isMine) {\n                                count++;\n                            }\n                        }\n                    }\n                    \n                    this.board[row][col].neighborCount = count;\n                }\n            }\n        }\n    }\n    \n    renderBoard() {\n        const { rows, cols } = this.difficulties[this.currentDifficulty];\n        \n        this.gameBoard.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;\n        this.gameBoard.innerHTML = '';\n        this.gameBoard.classList.remove('game-board');\n        this.gameBoard.classList.add('game-board-3d');\n        \n        // Apply 3D transforms\n        this.updateBoardTransform();\n        \n        for (let row = 0; row < rows; row++) {\n            for (let col = 0; col < cols; col++) {\n                const cell = this.createCell(row, col);\n                this.gameBoard.appendChild(cell);\n            }\n        }\n    }\n    \n    createCell(row, col) {\n        const cell = document.createElement('div');\n        cell.className = 'cell';\n        cell.dataset.row = row;\n        cell.dataset.col = col;\n        \n        // Add 3D entrance animation with delay\n        const delay = (row + col) * 50;\n        cell.style.animationDelay = `${delay}ms`;\n        \n        cell.addEventListener('click', (e) => this.handleCellClick(e, row, col));\n        cell.addEventListener('contextmenu', (e) => this.handleRightClick(e, row, col));\n        cell.addEventListener('mouseenter', (e) => this.handleCellHover(e, row, col));\n        \n        return cell;\n    }\n    \n    handleCellClick(event, row, col) {\n        event.preventDefault();\n        \n        if (this.gameState === 'won' || this.gameState === 'lost') return;\n        if (this.board[row][col].isRevealed || this.board[row][col].isFlagged) return;\n        \n        // First click handling\n        if (this.firstClick) {\n            this.placeMines(row, col);\n            this.firstClick = false;\n            this.gameState = 'playing';\n            this.startTimer();\n            this.statusTitle.textContent = 'MINING ACTIVE';\n            this.statusMessage.textContent = 'Detecting anomalies...';\n            this.stats.gamesPlayed++;\n            localStorage.setItem('gamesPlayed', this.stats.gamesPlayed.toString());\n        }\n        \n        // Check if cell is shielded\n        if (this.board[row][col].isShielded && this.board[row][col].isMine) {\n            this.board[row][col].isShielded = false;\n            this.showFloatingText(event.target, 'SHIELDED!', '#00ff41');\n            this.createShieldEffect(row, col);\n            return;\n        }\n        \n        this.revealCell(row, col);\n        this.updateDisplay();\n        this.checkWinCondition();\n        \n        // Update combo\n        this.updateCombo();\n    }\n    \n    handleRightClick(event, row, col) {\n        event.preventDefault();\n        \n        if (this.gameState === 'won' || this.gameState === 'lost') return;\n        if (this.board[row][col].isRevealed) return;\n        \n        const cell = this.board[row][col];\n        const cellElement = event.target;\n        \n        if (cell.isFlagged) {\n            cell.isFlagged = false;\n            cellElement.classList.remove('flagged');\n            this.flagsPlaced--;\n            this.createFlagEffect(cellElement, false);\n        } else {\n            cell.isFlagged = true;\n            cellElement.classList.add('flagged');\n            this.flagsPlaced++;\n            this.createFlagEffect(cellElement, true);\n        }\n        \n        this.updateDisplay();\n    }\n    \n    handleCellHover(event, row, col) {\n        if (this.gameState !== 'playing') return;\n        \n        const cell = this.board[row][col];\n        if (cell.isRevealed || cell.isFlagged) return;\n        \n        // Create hover particle effect\n        this.createHoverEffect(event.target);\n    }\n    \n    revealCell(row, col) {\n        const { rows, cols } = this.difficulties[this.currentDifficulty];\n        const cell = this.board[row][col];\n        \n        if (cell.isRevealed || cell.isFlagged) return;\n        \n        cell.isRevealed = true;\n        const cellElement = document.querySelector(`[data-row=\"${row}\"][data-col=\"${col}\"]`);\n        cellElement.classList.add('revealed');\n        \n        if (cell.isMine) {\n            this.gameOver(row, col);\n            return;\n        }\n        \n        // Add score for revealed cell\n        this.addScore(10 * this.combo);\n        \n        if (cell.neighborCount > 0) {\n            cellElement.textContent = cell.neighborCount;\n            cellElement.dataset.number = cell.neighborCount;\n            this.createNumberRevealEffect(cellElement, cell.neighborCount);\n        } else {\n            // Auto-reveal adjacent cells for empty cells\n            setTimeout(() => {\n                for (let dr = -1; dr <= 1; dr++) {\n                    for (let dc = -1; dc <= 1; dc++) {\n                        const newRow = row + dr;\n                        const newCol = col + dc;\n                        \n                        if (newRow >= 0 && newRow < rows && \n                            newCol >= 0 && newCol < cols) {\n                            this.revealCell(newRow, newCol);\n                        }\n                    }\n                }\n            }, 50);\n        }\n        \n        // Create reveal particle effect\n        this.createRevealEffect(cellElement);\n    }\n    \n    gameOver(mineRow, mineCol) {\n        this.gameState = 'lost';\n        clearInterval(this.timerInterval);\n        \n        // Create massive explosion effect\n        this.createExplosionEffect(mineRow, mineCol);\n        \n        // Reveal all mines with dramatic effect\n        const { rows, cols } = this.difficulties[this.currentDifficulty];\n        let delay = 0;\n        \n        for (let row = 0; row < rows; row++) {\n            for (let col = 0; col < cols; col++) {\n                if (this.board[row][col].isMine) {\n                    setTimeout(() => {\n                        const cellElement = document.querySelector(`[data-row=\"${row}\"][data-col=\"${col}\"]`);\n                        cellElement.classList.add('mine');\n                        this.createMineRevealEffect(cellElement);\n                    }, delay);\n                    delay += 100;\n                }\n            }\n        }\n        \n        this.avatarFace.textContent = '💀';\n        this.statusTitle.textContent = 'SYSTEM FAILURE';\n        this.statusMessage.textContent = 'Mine detonation detected!';\n        document.body.classList.add('game-lost');\n        \n        // Screen shake effect\n        this.createScreenShake();\n    }\n    \n    checkWinCondition() {\n        const { rows, cols, mines } = this.difficulties[this.currentDifficulty];\n        let revealedCount = 0;\n        \n        for (let row = 0; row < rows; row++) {\n            for (let col = 0; col < cols; col++) {\n                if (this.board[row][col].isRevealed && !this.board[row][col].isMine) {\n                    revealedCount++;\n                }\n            }\n        }\n        \n        const totalCells = rows * cols;\n        const totalMines = this.gameMode === 'nightmare' ? Math.floor(mines * 1.2) : mines;\n        \n        if (revealedCount === totalCells - totalMines) {\n            this.gameWon();\n        }\n    }\n    \n    gameWon() {\n        this.gameState = 'won';\n        clearInterval(this.timerInterval);\n        \n        // Update statistics\n        this.stats.gamesWon++;\n        if (!this.stats.bestTime || this.timer < parseInt(this.stats.bestTime)) {\n            this.stats.bestTime = this.timer.toString();\n            localStorage.setItem('bestTime', this.stats.bestTime);\n        }\n        localStorage.setItem('gamesWon', this.stats.gamesWon.toString());\n        \n        // Auto-flag remaining mines\n        const { rows, cols } = this.difficulties[this.currentDifficulty];\n        for (let row = 0; row < rows; row++) {\n            for (let col = 0; col < cols; col++) {\n                if (this.board[row][col].isMine && !this.board[row][col].isFlagged) {\n                    this.board[row][col].isFlagged = true;\n                    const cellElement = document.querySelector(`[data-row=\"${row}\"][data-col=\"${col}\"]`);\n                    cellElement.classList.add('flagged');\n                    this.flagsPlaced++;\n                }\n            }\n        }\n        \n        // Victory effects\n        this.createVictoryEffects();\n        \n        this.avatarFace.textContent = '🏆';\n        this.statusTitle.textContent = 'MISSION COMPLETE';\n        this.statusMessage.textContent = 'All mines neutralized!';\n        this.progressFill.style.width = '100%';\n        document.body.classList.add('game-won');\n        \n        // Check achievements\n        this.checkAchievements();\n        this.updateDisplay();\n        this.updateStats();\n    }\n    \n    // Power-up implementations\n    useHint() {\n        if (this.powerUps.hint.available <= 0 || this.gameState !== 'playing') return;\n        \n        this.powerUps.hint.available--;\n        this.updatePowerUpDisplay();\n        \n        // Find a safe cell to reveal\n        const safeCells = this.findSafeCells();\n        if (safeCells.length > 0) {\n            const randomCell = safeCells[Math.floor(Math.random() * safeCells.length)];\n            const cellElement = document.querySelector(`[data-row=\"${randomCell.row}\"][data-col=\"${randomCell.col}\"]`);\n            \n            this.createHintEffect(cellElement);\n            this.showFloatingText(cellElement, 'HINT!', '#00ff41');\n            \n            setTimeout(() => {\n                this.revealCell(randomCell.row, randomCell.col);\n            }, 1000);\n        }\n    }\n    \n    useScanner() {\n        if (this.powerUps.scanner.available <= 0 || this.gameState !== 'playing') return;\n        \n        this.powerUps.scanner.available--;\n        this.updatePowerUpDisplay();\n        \n        // Show mine count in 3x3 areas\n        const { rows, cols } = this.difficulties[this.currentDifficulty];\n        \n        for (let row = 0; row < rows; row += 3) {\n            for (let col = 0; col < cols; col += 3) {\n                const mineCount = this.countMinesInArea(row, col, 3, 3);\n                if (mineCount > 0) {\n                    const centerRow = Math.min(row + 1, rows - 1);\n                    const centerCol = Math.min(col + 1, cols - 1);\n                    const cellElement = document.querySelector(`[data-row=\"${centerRow}\"][data-col=\"${centerCol}\"]`);\n                    \n                    this.createScannerEffect(cellElement, mineCount);\n                }\n            }\n        }\n    }\n    \n    useShield() {\n        if (this.powerUps.shield.available <= 0 || this.gameState !== 'playing') return;\n        \n        this.powerUps.shield.available--;\n        this.updatePowerUpDisplay();\n        \n        // Find a random mine and shield it\n        const mines = this.getAllMines();\n        if (mines.length > 0) {\n            const randomMine = mines[Math.floor(Math.random() * mines.length)];\n            this.board[randomMine.row][randomMine.col].isShielded = true;\n            \n            const cellElement = document.querySelector(`[data-row=\"${randomMine.row}\"][data-col=\"${randomMine.col}\"]`);\n            this.createShieldEffect(randomMine.row, randomMine.col);\n            this.showFloatingText(cellElement, 'SHIELDED!', '#00ff41');\n        }\n    }\n    \n    // 3D Board controls\n    rotateBoard(deltaY, deltaX) {\n        this.boardRotation.y += deltaY;\n        this.boardRotation.x += deltaX;\n        \n        // Limit rotation ranges\n        this.boardRotation.x = Math.max(-45, Math.min(15, this.boardRotation.x));\n        this.boardRotation.y = Math.max(-45, Math.min(45, this.boardRotation.y));\n        \n        this.updateBoardTransform();\n    }\n    \n    zoomBoard(delta) {\n        this.boardZoom += delta;\n        this.boardZoom = Math.max(0.5, Math.min(2, this.boardZoom));\n        this.updateBoardTransform();\n    }\n    \n    updateBoardTransform() {\n        const transform = `rotateX(${this.boardRotation.x}deg) rotateY(${this.boardRotation.y}deg) scale(${this.boardZoom})`;\n        this.gameBoard.style.transform = transform;\n    }\n    \n    // Visual effects\n    createExplosionEffect(row, col) {\n        const cellElement = document.querySelector(`[data-row=\"${row}\"][data-col=\"${col}\"]`);\n        const rect = cellElement.getBoundingClientRect();\n        \n        // Create explosion particles\n        for (let i = 0; i < 20; i++) {\n            this.createParticle(rect.left + rect.width/2, rect.top + rect.height/2, {\n                type: 'explosion',\n                color: '#ff073a',\n                size: Math.random() * 10 + 5,\n                velocity: { x: (Math.random() - 0.5) * 20, y: (Math.random() - 0.5) * 20 }\n            });\n        }\n    }\n    \n    createVictoryEffects() {\n        // Confetti explosion\n        const colors = ['#00ffff', '#8a2be2', '#ff1493', '#00ff41', '#ffff00'];\n        \n        for (let i = 0; i < 50; i++) {\n            setTimeout(() => {\n                this.createParticle(\n                    Math.random() * window.innerWidth,\n                    -10,\n                    {\n                        type: 'confetti',\n                        color: colors[Math.floor(Math.random() * colors.length)],\n                        size: Math.random() * 8 + 4,\n                        velocity: { x: (Math.random() - 0.5) * 10, y: Math.random() * 5 + 5 }\n                    }\n                );\n            }, i * 100);\n        }\n    }\n    \n    createParticle(x, y, options) {\n        const particle = {\n            x: x,\n            y: y,\n            vx: options.velocity.x,\n            vy: options.velocity.y,\n            color: options.color,\n            size: options.size,\n            type: options.type,\n            life: 1.0,\n            decay: 0.02\n        };\n        \n        this.particles.push(particle);\n        \n        // Limit particle count\n        if (this.particles.length > this.maxParticles) {\n            this.particles.shift();\n        }\n    }\n    \n    animateParticles() {\n        // Update particles\n        for (let i = this.particles.length - 1; i >= 0; i--) {\n            const particle = this.particles[i];\n            \n            particle.x += particle.vx;\n            particle.y += particle.vy;\n            particle.vy += 0.5; // gravity\n            particle.life -= particle.decay;\n            \n            if (particle.life <= 0) {\n                this.particles.splice(i, 1);\n            }\n        }\n        \n        this.renderParticles();\n        requestAnimationFrame(() => this.animateParticles());\n    }\n    \n    renderParticles() {\n        // Clear existing particles in DOM\n        this.particleSystem.innerHTML = '';\n        \n        this.particles.forEach(particle => {\n            const element = document.createElement('div');\n            element.style.position = 'absolute';\n            element.style.left = particle.x + 'px';\n            element.style.top = particle.y + 'px';\n            element.style.width = particle.size + 'px';\n            element.style.height = particle.size + 'px';\n            element.style.backgroundColor = particle.color;\n            element.style.opacity = particle.life;\n            element.style.borderRadius = '50%';\n            element.style.pointerEvents = 'none';\n            element.style.boxShadow = `0 0 ${particle.size}px ${particle.color}`;\n            \n            this.particleSystem.appendChild(element);\n        });\n    }\n    \n    // Helper methods\n    findSafeCells() {\n        const { rows, cols } = this.difficulties[this.currentDifficulty];\n        const safeCells = [];\n        \n        for (let row = 0; row < rows; row++) {\n            for (let col = 0; col < cols; col++) {\n                const cell = this.board[row][col];\n                if (!cell.isMine && !cell.isRevealed && !cell.isFlagged) {\n                    safeCells.push(cell);\n                }\n            }\n        }\n        \n        return safeCells;\n    }\n    \n    getAllMines() {\n        const { rows, cols } = this.difficulties[this.currentDifficulty];\n        const mines = [];\n        \n        for (let row = 0; row < rows; row++) {\n            for (let col = 0; col < cols; col++) {\n                if (this.board[row][col].isMine) {\n                    mines.push(this.board[row][col]);\n                }\n            }\n        }\n        \n        return mines;\n    }\n    \n    countMinesInArea(startRow, startCol, width, height) {\n        const { rows, cols } = this.difficulties[this.currentDifficulty];\n        let count = 0;\n        \n        for (let row = startRow; row < Math.min(startRow + height, rows); row++) {\n            for (let col = startCol; col < Math.min(startCol + width, cols); col++) {\n                if (this.board[row][col].isMine) {\n                    count++;\n                }\n            }\n        }\n        \n        return count;\n    }\n    \n    startTimer() {\n        this.timerInterval = setInterval(() => {\n            this.timer++;\n            this.updateDisplay();\n            \n            // For speed mode, add pressure\n            if (this.gameMode === 'speed') {\n                const maxTime = 180; // 3 minutes\n                const progress = (this.timer / maxTime) * 100;\n                this.progressFill.style.width = Math.min(progress, 100) + '%';\n                \n                if (this.timer >= maxTime) {\n                    this.gameOver(0, 0);\n                }\n            }\n        }, 1000);\n    }\n    \n    updateDisplay() {\n        const { mines } = this.difficulties[this.currentDifficulty];\n        const totalMines = this.gameMode === 'nightmare' ? Math.floor(mines * 1.2) : mines;\n        \n        this.minesCount.textContent = totalMines;\n        this.timerElement.textContent = this.timer.toString().padStart(3, '0');\n        this.flagsCount.textContent = this.flagsPlaced;\n        this.scoreElement.textContent = this.score.toLocaleString();\n        this.comboValue.textContent = `×${this.combo}`;\n        \n        // Update combo bar\n        const comboProgress = Math.min((this.combo - 1) / 9, 1) * 100;\n        this.comboFill.style.width = comboProgress + '%';\n    }\n    \n    updateStats() {\n        this.gamesPlayedElement.textContent = this.stats.gamesPlayed;\n        this.bestTimeElement.textContent = this.stats.bestTime ? \n            this.formatTime(parseInt(this.stats.bestTime)) : '--:--';\n        \n        const winRate = this.stats.gamesPlayed > 0 ? \n            Math.round((this.stats.gamesWon / this.stats.gamesPlayed) * 100) : 0;\n        this.winRateElement.textContent = winRate + '%';\n    }\n    \n    formatTime(seconds) {\n        const mins = Math.floor(seconds / 60);\n        const secs = seconds % 60;\n        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;\n    }\n    \n    addScore(points) {\n        this.score += points;\n        this.updateDisplay();\n    }\n    \n    updateCombo() {\n        this.combo++;\n        if (this.combo > this.maxCombo) {\n            this.maxCombo = this.combo;\n        }\n        this.updateDisplay();\n    }\n    \n    resetCombo() {\n        this.combo = 1;\n        this.updateDisplay();\n    }\n    \n    // Achievement system\n    checkAchievements() {\n        // First win\n        if (!this.achievements.has('firstWin')) {\n            this.unlockAchievement('firstWin');\n        }\n        \n        // Speed demon (easy in under 30 seconds)\n        if (this.currentDifficulty === 'easy' && this.timer < 30) {\n            this.unlockAchievement('speedDemon');\n        }\n        \n        // Combo king\n        if (this.maxCombo >= 10) {\n            this.unlockAchievement('comboKing');\n        }\n        \n        // Games played milestone\n        if (this.stats.gamesPlayed >= 100) {\n            this.unlockAchievement('dedication');\n        }\n    }\n    \n    unlockAchievement(id) {\n        if (this.achievements.has(id)) return;\n        \n        this.achievements.set(id, Date.now());\n        localStorage.setItem('achievements', JSON.stringify([...this.achievements]));\n        \n        const achievement = this.achievementDefinitions[id];\n        this.showAchievement(achievement);\n    }\n    \n    showAchievement(achievement) {\n        const popup = this.achievementPopup;\n        const icon = popup.querySelector('.achievement-icon');\n        const title = popup.querySelector('.achievement-title');\n        const desc = popup.querySelector('.achievement-desc');\n        \n        icon.textContent = achievement.icon;\n        title.textContent = achievement.name;\n        desc.textContent = achievement.desc;\n        \n        popup.classList.add('show');\n        \n        setTimeout(() => {\n            popup.classList.remove('show');\n        }, 4000);\n    }\n    \n    // UI helpers\n    updatePowerUpDisplay() {\n        const hintCooldown = this.hintBtn.querySelector('.power-cooldown');\n        const scannerCooldown = this.scannerBtn.querySelector('.power-cooldown');\n        const shieldCooldown = this.shieldBtn.querySelector('.power-cooldown');\n        \n        // Update availability\n        this.hintBtn.classList.toggle('disabled', this.powerUps.hint.available <= 0);\n        this.scannerBtn.classList.toggle('disabled', this.powerUps.scanner.available <= 0);\n        this.shieldBtn.classList.toggle('disabled', this.powerUps.shield.available <= 0);\n        \n        // Update cooldown displays\n        hintCooldown.textContent = this.powerUps.hint.available;\n        scannerCooldown.textContent = this.powerUps.scanner.available;\n        shieldCooldown.textContent = this.powerUps.shield.available;\n        \n        hintCooldown.style.display = this.powerUps.hint.available > 0 ? 'flex' : 'none';\n        scannerCooldown.style.display = this.powerUps.scanner.available > 0 ? 'flex' : 'none';\n        shieldCooldown.style.display = this.powerUps.shield.available > 0 ? 'flex' : 'none';\n    }\n    \n    toggleSettings() {\n        this.settingsPanel.classList.toggle('show');\n    }\n    \n    handleKeyboard(event) {\n        switch (event.key) {\n            case 'r':\n            case 'R':\n                this.initializeGame();\n                break;\n            case 'h':\n            case 'H':\n                this.useHint();\n                break;\n            case 's':\n            case 'S':\n                this.useScanner();\n                break;\n            case 'Escape':\n                this.toggleSettings();\n                break;\n        }\n    }\n    \n    handleMouseMove(event) {\n        // Subtle board rotation based on mouse position\n        if (this.gameState === 'playing') {\n            const centerX = window.innerWidth / 2;\n            const centerY = window.innerHeight / 2;\n            \n            const deltaX = (event.clientX - centerX) / centerX;\n            const deltaY = (event.clientY - centerY) / centerY;\n            \n            const rotateY = this.boardRotation.y + deltaX * 2;\n            const rotateX = this.boardRotation.x + deltaY * 2;\n            \n            this.gameBoard.style.transform = \n                `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(${this.boardZoom})`;\n        }\n    }\n    \n    // Effect creators\n    createHoverEffect(element) {\n        element.style.filter = 'brightness(1.2)';\n        setTimeout(() => {\n            element.style.filter = '';\n        }, 200);\n    }\n    \n    createRevealEffect(element) {\n        element.style.animation = 'cellReveal 0.3s ease-out';\n    }\n    \n    createFlagEffect(element, isPlacing) {\n        const effect = isPlacing ? 'flagPlace' : 'flagRemove';\n        element.style.animation = `${effect} 0.4s ease-out`;\n    }\n    \n    createHintEffect(element) {\n        element.style.animation = 'hintGlow 1s ease-in-out';\n    }\n    \n    createScannerEffect(element, mineCount) {\n        this.showFloatingText(element, `${mineCount} 💣`, '#ffff00');\n    }\n    \n    createShieldEffect(row, col) {\n        const element = document.querySelector(`[data-row=\"${row}\"][data-col=\"${col}\"]`);\n        element.style.animation = 'shieldActivate 0.5s ease-out';\n    }\n    \n    createNumberRevealEffect(element, number) {\n        element.style.animation = `numberReveal${number} 0.4s ease-out`;\n    }\n    \n    createMineRevealEffect(element) {\n        element.style.animation = 'mineReveal 0.5s ease-out';\n    }\n    \n    createScreenShake() {\n        document.body.style.animation = 'screenShake 0.8s ease-out';\n        setTimeout(() => {\n            document.body.style.animation = '';\n        }, 800);\n    }\n    \n    showFloatingText(element, text, color) {\n        const floatingText = document.createElement('div');\n        floatingText.textContent = text;\n        floatingText.style.position = 'absolute';\n        floatingText.style.color = color;\n        floatingText.style.fontWeight = 'bold';\n        floatingText.style.fontSize = '14px';\n        floatingText.style.pointerEvents = 'none';\n        floatingText.style.zIndex = '1000';\n        floatingText.style.animation = 'floatingText 2s ease-out forwards';\n        \n        const rect = element.getBoundingClientRect();\n        floatingText.style.left = rect.left + rect.width / 2 + 'px';\n        floatingText.style.top = rect.top + 'px';\n        \n        document.body.appendChild(floatingText);\n        \n        setTimeout(() => {\n            floatingText.remove();\n        }, 2000);\n    }\n    \n    clearParticles() {\n        this.particles = [];\n        this.particleSystem.innerHTML = '';\n    }\n    \n    // Auto-solver (basic implementation)\n    autoSolve() {\n        if (this.gameState !== 'playing') return;\n        \n        const safeCells = this.findSafeCells();\n        if (safeCells.length > 0) {\n            const cell = safeCells[0];\n            this.revealCell(cell.row, cell.col);\n            this.updateDisplay();\n            this.checkWinCondition();\n            \n            // Continue solving\n            setTimeout(() => this.autoSolve(), 200);\n        }\n    }\n}\n\n// CSS animations (to be added to styles.css)\nconst additionalCSS = `\n@keyframes cellReveal {\n    from { transform: scale(0.8) rotateY(90deg); opacity: 0; }\n    to { transform: scale(1) rotateY(0deg); opacity: 1; }\n}\n\n@keyframes flagPlace {\n    from { transform: scale(0.5) rotate(-180deg); }\n    to { transform: scale(1) rotate(0deg); }\n}\n\n@keyframes flagRemove {\n    from { transform: scale(1) rotate(0deg); }\n    to { transform: scale(0.5) rotate(180deg); }\n}\n\n@keyframes hintGlow {\n    0%, 100% { box-shadow: 0 0 0px rgba(0, 255, 65, 0.5); }\n    50% { box-shadow: 0 0 30px rgba(0, 255, 65, 1); }\n}\n\n@keyframes shieldActivate {\n    0% { box-shadow: 0 0 0px rgba(0, 255, 255, 0.5); }\n    50% { box-shadow: 0 0 40px rgba(0, 255, 255, 1); }\n    100% { box-shadow: 0 0 20px rgba(0, 255, 255, 0.7); }\n}\n\n@keyframes mineReveal {\n    from { transform: scale(0.3) rotate(0deg); filter: hue-rotate(0deg); }\n    50% { transform: scale(1.2) rotate(180deg); filter: hue-rotate(180deg); }\n    to { transform: scale(1) rotate(360deg); filter: hue-rotate(360deg); }\n}\n\n@keyframes screenShake {\n    0%, 100% { transform: translateX(0px); }\n    10% { transform: translateX(-10px); }\n    20% { transform: translateX(10px); }\n    30% { transform: translateX(-8px); }\n    40% { transform: translateX(8px); }\n    50% { transform: translateX(-6px); }\n    60% { transform: translateX(6px); }\n    70% { transform: translateX(-4px); }\n    80% { transform: translateX(4px); }\n    90% { transform: translateX(-2px); }\n}\n\n@keyframes floatingText {\n    from { \n        opacity: 1; \n        transform: translateY(0px) scale(1); \n    }\n    to { \n        opacity: 0; \n        transform: translateY(-50px) scale(1.2); \n    }\n}\n`;\n\n// Add additional CSS to head\nconst style = document.createElement('style');\nstyle.textContent = additionalCSS;\ndocument.head.appendChild(style);\n\n// Initialize the ultimate minesweeper when page loads\ndocument.addEventListener('DOMContentLoaded', () => {\n    window.ultimateMinesweeper = new UltimateMinesweeper();\n});
